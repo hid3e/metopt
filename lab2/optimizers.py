@@ -1,17 +1,17 @@
-"""Методы градиентного спуска из лекции 6.
+"""Методы градиентного спуска из лекции 6
 
-Все методы используют одинаковый критерий остановки: ||grad f(x)|| <= eps
-(в точке минимума градиент равен нулю). Дополнительно есть ограничение
-по числу итераций и проверка на расходимость (если точка ушла слишком далеко).
+Одинаковый критерий остановки: ||grad f(x)|| <= eps
+Дополнительно есть ограничение по числу итераций и проверка на расходимость
 
-Каждый метод принимает обертку-счетчик oracle, через которую считаются
-вызовы функции и градиента, и возвращает словарь с результатами.
+Каждый метод принимает обертку-счетчик oracle через которую считаются
+вызовы функции и градиента и возвращает словарь с результатами
 """
 
 import numpy as np
 
+
 class Counter:
-    """Обертка над функцией и градиентом, которая считает число вызовов."""
+    # Обертка над функцией и градиентом, которая считает число вызовов
 
     def __init__(self, f, grad):
         self._f = f
@@ -27,6 +27,7 @@ class Counter:
         self.ng += 1
         return self._grad(x)
 
+
 def _result(x, traj, iters, converged, oracle):
     return {
         "x": x,
@@ -36,6 +37,7 @@ def _result(x, traj, iters, converged, oracle):
         "nf": oracle.nf,
         "ng": oracle.ng,
     }
+
 
 def gd_const(oracle, x0, alpha, eps, max_iter=100000):
     x = np.array(x0, dtype=float)
@@ -48,11 +50,12 @@ def gd_const(oracle, x0, alpha, eps, max_iter=100000):
             converged = True
             break
         x = x - alpha * g
-        if np.linalg.norm(x) > 1e6:   # точка улетела слишком далеко - метод разошелся
+        if np.linalg.norm(x) > 1e6:
             break
         traj.append(x.copy())
         it += 1
     return _result(x, traj, it, converged, oracle)
+
 
 def gd_armijo(oracle, x0, eps, c1=1e-4, q=0.5, alpha0=1.0, max_iter=100000):
     x = np.array(x0, dtype=float)
@@ -72,18 +75,19 @@ def gd_armijo(oracle, x0, eps, c1=1e-4, q=0.5, alpha0=1.0, max_iter=100000):
             if alpha < 1e-20:
                 break
         x = x - alpha * g
-        if np.linalg.norm(x) > 1e6:   # точка улетела слишком далеко - метод разошелся
+        if np.linalg.norm(x) > 1e6:
             break
         traj.append(x.copy())
         it += 1
     return _result(x, traj, it, converged, oracle)
 
-def _wolfe_step(oracle, x, g, fx, c1, c2, a_max=10.0):
-    """Поиск шага вдоль направления p = -g, удовлетворяющего сильным условиям Вольфе.
 
-    phi(a)  = f(x - a g),  phi'(a) = <grad f(x - a g), -g>.
-    phi(0) = fx, phi'(0) = -||g||^2 < 0.
-    Возвращает длину шага a.
+def _wolfe_step(oracle, x, g, fx, c1, c2, a_max=10.0):
+    """Поиск шага вдоль направления p = -g, удовлетворяющего сильным условиям Вольфе
+
+    phi(a)  = f(x - a g),  phi'(a) = <grad f(x - a g), -g>
+    phi(0) = fx, phi'(0) = -||g||^2 < 0
+    Возвращает длину шага a
     """
     dphi0 = -(g @ g)
 
@@ -121,6 +125,7 @@ def _wolfe_step(oracle, x, g, fx, c1, c2, a_max=10.0):
         a = min(2 * a, a_max)
     return a
 
+
 def gd_wolfe(oracle, x0, eps, c1=1e-4, c2=0.9, max_iter=100000):
     x = np.array(x0, dtype=float)
     traj = [x.copy()]
@@ -134,17 +139,16 @@ def gd_wolfe(oracle, x0, eps, c1=1e-4, c2=0.9, max_iter=100000):
         fx = oracle.f(x)
         alpha = _wolfe_step(oracle, x, g, fx, c1, c2)
         x = x - alpha * g
-        if np.linalg.norm(x) > 1e6:   # точка улетела слишком далеко - метод разошелся
+        if np.linalg.norm(x) > 1e6:
             break
         traj.append(x.copy())
         it += 1
     return _result(x, traj, it, converged, oracle)
 
-def _bracket_min(phi, step=1.0):
-    """Расширяем интервал удвоением, пока функция убывает (схема из лекции 6).
 
-    Возвращает интервал [a, c], внутри которого лежит минимум phi(a), a >= 0.
-    """
+def _bracket_min(phi, step=1.0):
+    # Расширяем интервал удвоением, пока функция убывает (схема из лекции 6)
+    # Возвращает интервал [a, c], внутри которого лежит минимум phi(a), a >= 0
     a, fa = 0.0, phi(0.0)
     b, fb = step, phi(step)
     if fb > fa:
@@ -157,8 +161,9 @@ def _bracket_min(phi, step=1.0):
         a, fa = b, fb
         b, fb = c, fc
 
+
 def _golden(phi, a, b, tol=1e-8):
-    """Метод золотого сечения из лекции 2 для минимизации phi на [a, b]."""
+    # Метод золотого сечения из лекции 2 для минимизации phi на [a, b]
     inv_phi = (np.sqrt(5) - 1) / 2
     c = b - inv_phi * (b - a)
     d = a + inv_phi * (b - a)
@@ -173,6 +178,7 @@ def _golden(phi, a, b, tol=1e-8):
             d = a + inv_phi * (b - a)
             fd = phi(d)
     return 0.5 * (a + b)
+
 
 def gd_steepest(oracle, x0, eps, max_iter=100000):
     x = np.array(x0, dtype=float)
@@ -191,7 +197,7 @@ def gd_steepest(oracle, x0, eps, max_iter=100000):
         a, b = _bracket_min(phi)
         alpha = _golden(phi, a, b)
         x = x - alpha * g
-        if np.linalg.norm(x) > 1e6:   # точка улетела слишком далеко - метод разошелся
+        if np.linalg.norm(x) > 1e6:
             break
         traj.append(x.copy())
         it += 1
